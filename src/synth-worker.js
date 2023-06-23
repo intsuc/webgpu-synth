@@ -144,8 +144,7 @@ async function initialize(sampleRate) {
     outputs[0].set(results, index);
     resultsBuffer.unmap();
 
-    phase += kernelLength * frequency;
-    phase %= sampleRate;
+    phase = (phase + kernelLength * frequency) % sampleRate;
 
     index += kernelLength;
     if (index === bufferLength) {
