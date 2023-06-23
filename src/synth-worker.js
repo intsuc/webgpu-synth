@@ -10,7 +10,7 @@ import { stateIndex } from "./constants.js";
  */
 function generateCode(sampleRate) {
   return `
-const tau: f32 = ${2.0 * Math.PI / sampleRate};
+const tau_normalized: f32 = ${2.0 * Math.PI / sampleRate};
 
 @group(0)
 @binding(0)
@@ -31,7 +31,7 @@ fn main(
   global_invocation_id : vec3<u32>
 ) {
   let index = global_invocation_id.x;
-  samples[index] = sin(tau * frequency * f32(phase + index));
+  samples[index] = sin(tau_normalized * (f32(phase) + f32(index) * frequency));
 }
 `;
 }
@@ -125,7 +125,8 @@ async function initialize(sampleRate) {
     phaseArray[0] = phase;
     queue.writeBuffer(phaseBuffer, 0, phaseArray);
 
-    frequencyArray[0] = states[stateIndex.frequency];
+    const frequency = states[stateIndex.frequency]
+    frequencyArray[0] = frequency;
     queue.writeBuffer(frequencyBuffer, 0, frequencyArray);
 
     const encoder = device.createCommandEncoder();
@@ -143,10 +144,8 @@ async function initialize(sampleRate) {
     outputs[0].set(results, index);
     resultsBuffer.unmap();
 
-    phase += kernelLength;
-    if (phase >= sampleRate) {
-      phase -= sampleRate;
-    }
+    phase += kernelLength * frequency;
+    phase %= sampleRate;
 
     index += kernelLength;
     if (index === bufferLength) {
