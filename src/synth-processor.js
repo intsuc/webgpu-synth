@@ -1,8 +1,20 @@
 // @ts-check
 
+import { stateIndex } from "./constants.js";
+
 /** @typedef {import("./messages").Data} Data */
 
 export default class SynthProcessor extends AudioWorkletProcessor {
+  static get parameterDescriptors() {
+    return [
+      {
+        name: "frequency",
+        defaultValue: 480,
+        automationRate: "k-rate",
+      },
+    ];
+  }
+
   /** @type {boolean} */
   #initialized = false;
 
@@ -58,8 +70,10 @@ export default class SynthProcessor extends AudioWorkletProcessor {
     outputFrame.set(this.#outputs[0].subarray(this.#outputReadIndex, endIndex));
     this.#outputReadIndex = endIndex;
 
+    this.#states[stateIndex.frequency] = parameters["frequency"][0];
+
     if (++this.#inputFrameLength >= 8) {
-      Atomics.notify(this.#states, 0, 1);
+      Atomics.notify(this.#states, stateIndex.request, 1);
 
       this.#inputFrameLength = 0;
       if (this.#outputReadIndex === this.#outputs[0].length) {

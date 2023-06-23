@@ -1,15 +1,16 @@
 // @ts-check
 /// <reference types="@webgpu/types" />
 
+import { stateIndex } from "./constants.js";
+
 /** @typedef {import("./messages").Data} Data */
 
 /**
- * @param {number} frequency
  * @param {number} sampleRate
  */
-function generateCode(frequency, sampleRate) {
+function generateCode(sampleRate) {
   return `
-const omega: f32 = ${2.0 * Math.PI * frequency / sampleRate};
+const tau: f32 = ${2.0 * Math.PI / sampleRate};
 
 @group(0)
 @binding(0)
@@ -17,6 +18,10 @@ var<uniform> phase: u32;
 
 @group(0)
 @binding(1)
+var<uniform> frequency: f32;
+
+@group(0)
+@binding(2)
 var<storage, read_write> samples: array<f32>;
 
 @compute
@@ -26,7 +31,7 @@ fn main(
   global_invocation_id : vec3<u32>
 ) {
   let index = global_invocation_id.x;
-  samples[index] = sin(omega * f32(phase + index));
+  samples[index] = sin(tau * frequency * f32(phase + index));
 }
 `;
 }
@@ -46,7 +51,8 @@ async function initialize(sampleRate) {
   const bindGroupLayout = device.createBindGroupLayout({
     entries: [
       { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: "uniform" } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "uniform" } },
+      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
     ],
   });
 
@@ -54,6 +60,13 @@ async function initialize(sampleRate) {
   const phaseBuffer = device.createBuffer({
     label: "phase",
     size: phaseArray.byteLength,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+
+  const frequencyArray = new Float32Array([0.0]);
+  const frequencyBuffer = device.createBuffer({
+    label: "frequency",
+    size: frequencyArray.byteLength,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
 
@@ -69,7 +82,8 @@ async function initialize(sampleRate) {
     layout: bindGroupLayout,
     entries: [
       { binding: 0, resource: { buffer: phaseBuffer } },
-      { binding: 1, resource: { buffer: samplesBuffer } },
+      { binding: 1, resource: { buffer: frequencyBuffer } },
+      { binding: 2, resource: { buffer: samplesBuffer } },
     ],
   });
 
@@ -85,14 +99,15 @@ async function initialize(sampleRate) {
     }),
     compute: {
       module: device.createShaderModule({
-        code: generateCode(480 /* TODO */, sampleRate),
+        code: generateCode(sampleRate),
       }),
       entryPoint: "main",
     },
   });
+  const queue = device.queue;
 
   const buffers = {
-    states: new SharedArrayBuffer(1 * Int32Array.BYTES_PER_ELEMENT),
+    states: new SharedArrayBuffer(Object.entries(stateIndex).length * Int32Array.BYTES_PER_ELEMENT),
     output: new SharedArrayBuffer(bufferLength * channelLength * Float32Array.BYTES_PER_ELEMENT),
   }
   const states = new Int32Array(buffers.states);
@@ -106,9 +121,12 @@ async function initialize(sampleRate) {
   let phase = 0;
   let index = 0;
 
-  while (Atomics.wait(states, 0, 0) === "ok") {
+  while (Atomics.wait(states, stateIndex.request, 0) === "ok") {
     phaseArray[0] = phase;
-    device.queue.writeBuffer(phaseBuffer, 0, phaseArray);
+    queue.writeBuffer(phaseBuffer, 0, phaseArray);
+
+    frequencyArray[0] = states[stateIndex.frequency];
+    queue.writeBuffer(frequencyBuffer, 0, frequencyArray);
 
     const encoder = device.createCommandEncoder();
     const pass = encoder.beginComputePass();
@@ -118,7 +136,7 @@ async function initialize(sampleRate) {
     pass.end();
     encoder.copyBufferToBuffer(samplesBuffer, 0, resultsBuffer, 0, resultsBuffer.size);
     const commandBuffer = encoder.finish();
-    device.queue.submit([commandBuffer]);
+    queue.submit([commandBuffer]);
 
     await resultsBuffer.mapAsync(GPUMapMode.READ);
     const results = new Float32Array(resultsBuffer.getMappedRange());
@@ -135,7 +153,7 @@ async function initialize(sampleRate) {
       index = 0;
     }
 
-    Atomics.store(states, 0, 0);
+    Atomics.store(states, stateIndex.request, 0);
   }
 }
 

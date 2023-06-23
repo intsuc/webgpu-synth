@@ -8,6 +8,15 @@ async function playAudio() {
 
   const synth = await createSynth(context);
   synth.connect(context.destination);
+  const frequencyParameter = /** @type {AudioParam} */ (synth.parameters.get("frequency"));
+
+  const frequencyControl = /** @type {HTMLInputElement} */ (document.getElementById("frequency-control"));
+  frequencyParameter.setValueAtTime(frequencyControl.valueAsNumber, context.currentTime);
+
+  frequencyControl.addEventListener("input", () => {
+    frequencyParameter.setValueAtTime(frequencyControl.valueAsNumber, context.currentTime);
+  });
+
   context.resume();
 };
 

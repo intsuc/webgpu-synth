@@ -27,7 +27,7 @@ class SynthNode extends AudioWorkletNode {
   constructor(context, options = undefined, onInit) {
     super(context, "synth", options);
 
-    this.#worker = new Worker("src/synth-worker.js");
+    this.#worker = new Worker("src/synth-worker.js", { type: "module" });
 
     this.#worker.onmessage = (event) => {
       const data = /** @type {Data} */ (event.data);
