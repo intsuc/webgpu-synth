@@ -4,25 +4,29 @@
 
 export default class SynthProcessor extends AudioWorkletProcessor {
   /** @type {boolean} */
-  #initialized;
+  #initialized = false;
 
   /** @type {Int32Array} */
   #states;
 
   /** @type {Float32Array[]} */
-  #output;
+  #outputs;
+
+  /** @type {number} */
+  #outputReadIndex = 0;
+
+  /** @type {number} */
+  #inputFrameLength = 0;
 
   constructor() {
     super();
-
-    this.#initialized = false;
 
     this.port.onmessage = (event) => {
       const data = /** @type {Data} */ (event.data);
       switch (data.type) {
         case "worker_ready": {
           this.#states = new Int32Array(data.buffers.states);
-          this.#output = [new Float32Array(data.buffers.output)];
+          this.#outputs = [new Float32Array(data.buffers.output)];
 
           this.#initialized = true;
           this.port.postMessage(/** @type {Data} */({
@@ -39,23 +43,28 @@ export default class SynthProcessor extends AudioWorkletProcessor {
   }
 
   /**
-   * @param {Float32Array[][]} inputs
+   * @param {Float32Array[][]} _inputs
    * @param {Float32Array[][]} outputs
    * @param {Record<string, Float32Array>} parameters
    * @returns {boolean}
    */
-  process(inputs, outputs, parameters) {
+  process(_inputs, outputs, parameters) {
     if (!this.#initialized) {
       return true;
     }
 
-    const input = inputs[0];
-    const output = outputs[0];
+    const outputFrame = outputs[0][0];
+    const endIndex = this.#outputReadIndex + outputFrame.length;
+    outputFrame.set(this.#outputs[0].subarray(this.#outputReadIndex, endIndex));
+    this.#outputReadIndex = endIndex;
 
-    for (let channel = 0; channel < output.length; ++channel) {
-      const inputFrame = input[channel];
-      const outputFrame = output[channel]
-      outputFrame.set(inputFrame);
+    if (++this.#inputFrameLength >= 8) {
+      Atomics.notify(this.#states, 0, 1);
+
+      this.#inputFrameLength = 0;
+      if (this.#outputReadIndex === this.#outputs[0].length) {
+        this.#outputReadIndex = 0;
+      }
     }
 
     return true;

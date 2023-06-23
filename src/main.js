@@ -7,9 +7,7 @@ async function playAudio() {
   const { createSynth } = await import("./synth-node.js");
 
   const synth = await createSynth(context);
-  const oscillator = new OscillatorNode(context, { frequency: 20 });
-  oscillator.connect(synth).connect(context.destination);
-  oscillator.start();
+  synth.connect(context.destination);
   context.resume();
 };
 
