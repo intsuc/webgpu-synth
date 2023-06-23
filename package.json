@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@types/audioworklet": "^0.0.48",
     "@webgpu/types": "^0.1.34"
   }
 }
