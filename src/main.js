@@ -1,6 +1,6 @@
 // @ts-check
 
-window.addEventListener("load", async () => {
+async function playAudio() {
   const context = new AudioContext();
 
   await context.audioWorklet.addModule("src/synth-processor.js");
@@ -35,4 +35,8 @@ window.addEventListener("load", async () => {
   });
 
   context.resume();
+}
+
+window.addEventListener("load", () => {
+  window.addEventListener("click", playAudio, { once: true });
 });
