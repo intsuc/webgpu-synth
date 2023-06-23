@@ -121,7 +121,7 @@ async function initialize(sampleRate) {
   let phase = 0;
   let index = 0;
 
-  while (Atomics.wait(states, stateIndex.request, 0) === "ok") {
+  while (Atomics.wait(states, stateIndex.processRequest, 0) === "ok") {
     phaseArray[0] = phase;
     queue.writeBuffer(phaseBuffer, 0, phaseArray);
 
@@ -153,7 +153,7 @@ async function initialize(sampleRate) {
       index = 0;
     }
 
-    Atomics.store(states, stateIndex.request, 0);
+    Atomics.store(states, stateIndex.processRequest, 0);
   }
 }
 

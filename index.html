@@ -11,8 +11,13 @@
 <body>
   <script src="coi-serviceworker.js"></script>
 
-  <button id="play" disabled>play</button>
-  <input id="frequency-control" type="number" name="frequency" value="480" /> Hz
+  <div style="display: inline-flex; flex-direction: column;">
+    <div>
+      <button id="play" disabled>play</button>
+      <input id="frequency-control" type="number" name="frequency" value="480" /> Hz
+    </div>
+    <canvas id="display" width="800" height="450"></canvas>
+  </div>
 
   <script src="src/main.js" type="module"></script>
 </body>

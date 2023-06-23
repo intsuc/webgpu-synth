@@ -1,6 +1,7 @@
 // @ts-check
 
 export const stateIndex = {
-  request: 0,
-  frequency: 1,
+  processRequest: 0,
+  outputKernelIndex: 1,
+  frequency: 2,
 };

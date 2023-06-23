@@ -21,11 +21,14 @@ export default class SynthProcessor extends AudioWorkletProcessor {
   /** @type {Int32Array} */
   #states;
 
-  /** @type {Float32Array[]} */
-  #outputs;
+  /** @type {Float32Array} */
+  #output;
 
   /** @type {number} */
-  #outputReadIndex = 0;
+  #outputFrameIndex = 0;
+
+  /** @type {number} */
+  #outputKernelIndex = 0;
 
   /** @type {number} */
   #inputFrameLength = 0;
@@ -38,7 +41,7 @@ export default class SynthProcessor extends AudioWorkletProcessor {
       switch (data.type) {
         case "worker_ready": {
           this.#states = new Int32Array(data.buffers.states);
-          this.#outputs = [new Float32Array(data.buffers.output)];
+          this.#output = new Float32Array(data.buffers.output);
 
           this.#initialized = true;
           this.port.postMessage(/** @type {Data} */({
@@ -66,19 +69,25 @@ export default class SynthProcessor extends AudioWorkletProcessor {
     }
 
     const outputFrame = outputs[0][0];
-    const endIndex = this.#outputReadIndex + outputFrame.length;
-    outputFrame.set(this.#outputs[0].subarray(this.#outputReadIndex, endIndex));
-    this.#outputReadIndex = endIndex;
+    const endIndex = this.#outputFrameIndex + outputFrame.length;
+    outputFrame.set(this.#output.subarray(this.#outputFrameIndex, endIndex));
+    this.#outputFrameIndex = endIndex;
 
     this.#states[stateIndex.frequency] = parameters["frequency"][0];
 
     if (++this.#inputFrameLength >= 8) {
-      Atomics.notify(this.#states, stateIndex.request, 1);
+      Atomics.notify(this.#states, stateIndex.processRequest, 1);
+
+      if (++this.#outputKernelIndex === 4) {
+        this.#outputKernelIndex = 0;
+      }
+      this.#states[stateIndex.outputKernelIndex] = this.#outputKernelIndex;
+
+      if (this.#outputFrameIndex === this.#output.length) {
+        this.#outputFrameIndex = 0;
+      }
 
       this.#inputFrameLength = 0;
-      if (this.#outputReadIndex === this.#outputs[0].length) {
-        this.#outputReadIndex = 0;
-      }
     }
 
     return true;
