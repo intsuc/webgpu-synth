@@ -85,7 +85,13 @@ export default class SynthProcessor extends AudioWorkletProcessor {
     const endIndex = startIndex + outputFrame.length;
 
     this.#states[stateIndex.frequency] = frequency;
-    this.#amplitudes.set(amplitude, startIndex);
+
+    if (amplitude.length === 1) {
+      this.#amplitudes.fill(amplitude[0], startIndex, endIndex);
+    } else {
+      this.#amplitudes.set(amplitude, startIndex);
+    }
+
     outputFrame.set(this.#output.subarray(startIndex, endIndex));
     this.#outputSampleIndex = endIndex;
 
