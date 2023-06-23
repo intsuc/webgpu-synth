@@ -2,6 +2,7 @@
 
 import { stateIndex } from "./constants.js";
 
+/** @typedef {import("./messages").SharedBuffers} SharedBuffers */
 /** @typedef {import("./messages").Data} Data */
 
 /**
@@ -21,15 +22,6 @@ class SynthNode extends AudioWorkletNode {
   /** @type {Worker} */
   #worker;
 
-  /** @type {Int32Array} */
-  #states;
-
-  /** @type {Float32Array} */
-  #output;
-
-  /** @type {HTMLCanvasElement} */
-  #canvas;
-
   /**
    * @param {BaseAudioContext} context
    * @param {AudioWorkletNodeOptions | undefined} options
@@ -44,15 +36,12 @@ class SynthNode extends AudioWorkletNode {
       const data = /** @type {Data} */ (event.data);
       switch (data.type) {
         case "worker_ready": {
-          this.#states = new Int32Array(data.buffers.states);
-          this.#output = new Float32Array(data.buffers.output);
-
           this.port.postMessage(/** @type {Data} */({
             type: "worker_ready",
             buffers: data.buffers,
           }));
 
-          this.#initialize();
+          this.#initialize(data.buffers);
           break;
         }
         default: {
@@ -82,8 +71,105 @@ class SynthNode extends AudioWorkletNode {
     }));
   }
 
-  #initialize() {
-    this.#canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("display"));
+  static get #code() {
+    return `
+@group(0) @binding(0) var<storage, read> samples: array<f32>;
+
+@vertex fn vertex_main(
+  @builtin(vertex_index) index : u32
+) -> @builtin(position) vec4f {
+  return vec4f(f32(index) / 512.0 - 1.0, samples[index], 0.0, 1.0);
+}
+
+@fragment fn fragment_main() -> @location(0) vec4f {
+  return vec4f(0.5725490196, 0.83921568627, 0.90196078431, 1.0);
+}
+`;
+  }
+
+  /**
+   * @param {SharedBuffers} buffers
+   */
+  async #initialize(buffers) {
+    const kernelLength = 1024;
+
+    const states = new Int32Array(buffers.states);
+    const output = new Float32Array(buffers.output);
+
+    // TODO: handle errors
+    const adapter = /** @type {GPUAdapter} */ (await navigator.gpu.requestAdapter());
+    const device = await adapter.requestDevice();
+    const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("display"));
+    const context = /** @type {GPUCanvasContext} */ (canvas.getContext("webgpu"));
+    const format = navigator.gpu.getPreferredCanvasFormat();
+    context.configure({ device, format });
+
+    const bindGroupLayout = device.createBindGroupLayout({
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: "read-only-storage" } },
+      ],
+    });
+    const bufferSize = kernelLength * Float32Array.BYTES_PER_ELEMENT;
+    const samplesBuffer = device.createBuffer({
+      label: "samples",
+      size: bufferSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    const bindGroup = device.createBindGroup({
+      layout: bindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: samplesBuffer } },
+      ],
+    });
+    const module = device.createShaderModule({
+      code: SynthNode.#code,
+    });
+    const pipeline = device.createRenderPipeline({
+      layout: device.createPipelineLayout({
+        bindGroupLayouts: [bindGroupLayout],
+      }),
+      vertex: {
+        module,
+        entryPoint: "vertex_main",
+      },
+      fragment: {
+        module,
+        entryPoint: "fragment_main",
+        targets: [{ format }],
+      },
+      primitive: {
+        topology: "line-strip",
+      },
+    });
+    /** @type {GPURenderPassDescriptor} */
+    const renderPassDescriptor = {
+      colorAttachments: [{
+        clearValue: [1 / 255, 4 / 255, 9 / 255, 1.0],
+        loadOp: "clear",
+        storeOp: "store",
+        view: context.getCurrentTexture().createView(),
+      }],
+    };
+    const queue = device.queue;
+
+    const draw = () => {
+      requestAnimationFrame(draw);
+
+      renderPassDescriptor.colorAttachments[0].view = context.getCurrentTexture().createView();
+
+      const offset = kernelLength * states[stateIndex.outputKernelIndex];
+      queue.writeBuffer(samplesBuffer, 0, output, offset, kernelLength);
+
+      const encoder = device.createCommandEncoder();
+      const pass = encoder.beginRenderPass(renderPassDescriptor);
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, bindGroup);
+      pass.draw(kernelLength);
+      pass.end();
+      const commandBuffer = encoder.finish();
+      queue.submit([commandBuffer]);
+    };
+    draw();
 
     new ResizeObserver((entries) => {
       const entry = entries[0];
@@ -92,31 +178,7 @@ class SynthNode extends AudioWorkletNode {
       const height = entry.contentBoxSize[0].blockSize;
       canvas.width = width;
       canvas.height = height;
-      this.#draw();
-    }).observe(this.#canvas);
-
-    this.#draw();
-  }
-
-  #draw() {
-    requestAnimationFrame(this.#draw.bind(this));
-
-    const kernelLength = 1024;
-    const width = this.#canvas.width;
-    const height = this.#canvas.height;
-    const centerHeight = height / 2;
-    const step = width / kernelLength;
-    const startIndex = kernelLength * this.#states[stateIndex.outputKernelIndex];
-
-    // TODO: use webgpu
-    const context = /** @type {CanvasRenderingContext2D } */ (this.#canvas.getContext("2d"));
-    context.clearRect(0, 0, width, height);
-    context.beginPath();
-    context.moveTo(0, centerHeight - this.#output[startIndex] * centerHeight);
-    for (let i = 1; i < kernelLength; ++i) {
-      context.lineTo(i * step, centerHeight - this.#output[startIndex + i] * centerHeight);
-    }
-
-    context.stroke();
+      draw();
+    }).observe(canvas);
   }
 }

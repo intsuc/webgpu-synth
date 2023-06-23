@@ -12,7 +12,7 @@ flowchart LR
   MainScope --> DedicatedWorkerGlobalScope
   States --> MainScope
   OutputBuffer --> MainScope
-  MainScope <-- TODO --> GPU
+  MainScope <--> GPU
 
   DedicatedWorkerGlobalScope --> OutputBuffer
   DedicatedWorkerGlobalScope <--> States

@@ -1,3 +1,8 @@
+export type SharedBuffers = {
+  states: SharedArrayBuffer,
+  output: SharedArrayBuffer,
+};
+
 export type Data =
   | {
     type: "initialize_worker",
@@ -5,10 +10,7 @@ export type Data =
   }
   | {
     type: "worker_ready",
-    buffers: {
-      states: SharedArrayBuffer,
-      output: SharedArrayBuffer,
-    },
+    buffers: SharedBuffers,
   }
   | {
     type: "processor_ready",
