@@ -1,6 +1,7 @@
 export type SharedBuffers = {
   states: SharedArrayBuffer,
-  output: SharedArrayBuffer,
+  amplitudes: SharedArrayBuffer,
+  samples: SharedArrayBuffer,
 };
 
 export type Data =

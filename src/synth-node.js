@@ -94,7 +94,7 @@ class SynthNode extends AudioWorkletNode {
     const kernelLength = 1024;
 
     const states = new Int32Array(buffers.states);
-    const output = new Float32Array(buffers.output);
+    const samples = new Float32Array(buffers.samples);
 
     // TODO: handle errors
     const adapter = /** @type {GPUAdapter} */ (await navigator.gpu.requestAdapter());
@@ -158,7 +158,7 @@ class SynthNode extends AudioWorkletNode {
       renderPassDescriptor.colorAttachments[0].view = context.getCurrentTexture().createView();
 
       const offset = kernelLength * states[stateIndex.outputKernelIndex];
-      queue.writeBuffer(samplesBuffer, 0, output, offset, kernelLength);
+      queue.writeBuffer(samplesBuffer, 0, samples, offset, kernelLength);
 
       const encoder = device.createCommandEncoder();
       const pass = encoder.beginRenderPass(renderPassDescriptor);

@@ -22,6 +22,10 @@ var<uniform> frequency: f32;
 
 @group(0)
 @binding(2)
+var<storage, read_write> amplitudes: array<f32>;
+
+@group(0)
+@binding(3)
 var<storage, read_write> samples: array<f32>;
 
 @compute
@@ -31,7 +35,7 @@ fn main(
   global_invocation_id : vec3<u32>
 ) {
   let index = global_invocation_id.x;
-  samples[index] = sin(tau_normalized * (f32(phase) + f32(index) * frequency));
+  samples[index] = amplitudes[index] * sin(tau_normalized * (f32(phase) + f32(index) * frequency));
 }
 `;
 }
@@ -42,7 +46,6 @@ fn main(
 async function initialize(sampleRate) {
   const kernelLength = 1024;
   const bufferLength = kernelLength * 4;
-  const channelLength = 1;
 
   // TODO: handle errors
   const adapter = /** @type {GPUAdapter} */ (await navigator.gpu.requestAdapter());
@@ -53,6 +56,7 @@ async function initialize(sampleRate) {
       { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: "uniform" } },
       { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "uniform" } },
       { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
+      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
     ],
   });
 
@@ -72,6 +76,12 @@ async function initialize(sampleRate) {
 
   const bufferSize = kernelLength * Float32Array.BYTES_PER_ELEMENT;
 
+  const amplitudesBuffer = device.createBuffer({
+    label: "amplitude",
+    size: bufferSize,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+  });
+
   const samplesBuffer = device.createBuffer({
     label: "samples",
     size: bufferSize,
@@ -83,7 +93,8 @@ async function initialize(sampleRate) {
     entries: [
       { binding: 0, resource: { buffer: phaseBuffer } },
       { binding: 1, resource: { buffer: frequencyBuffer } },
-      { binding: 2, resource: { buffer: samplesBuffer } },
+      { binding: 2, resource: { buffer: amplitudesBuffer } },
+      { binding: 3, resource: { buffer: samplesBuffer } },
     ],
   });
 
@@ -108,10 +119,12 @@ async function initialize(sampleRate) {
 
   const buffers = {
     states: new SharedArrayBuffer(Object.entries(stateIndex).length * Int32Array.BYTES_PER_ELEMENT),
-    output: new SharedArrayBuffer(bufferLength * channelLength * Float32Array.BYTES_PER_ELEMENT),
+    amplitudes: new SharedArrayBuffer(bufferLength * Float32Array.BYTES_PER_ELEMENT),
+    samples: new SharedArrayBuffer(bufferLength * Float32Array.BYTES_PER_ELEMENT),
   }
   const states = new Int32Array(buffers.states);
-  const outputs = [new Float32Array(buffers.output)];
+  const amplitudes = new Float32Array(buffers.amplitudes);
+  const samples = new Float32Array(buffers.samples);
 
   postMessage(/** @type {Data} */({
     type: "worker_ready",
@@ -125,9 +138,11 @@ async function initialize(sampleRate) {
     phaseArray[0] = phase;
     queue.writeBuffer(phaseBuffer, 0, phaseArray);
 
-    const frequency = states[stateIndex.frequency]
+    const frequency = states[stateIndex.frequency];
     frequencyArray[0] = frequency;
     queue.writeBuffer(frequencyBuffer, 0, frequencyArray);
+
+    queue.writeBuffer(amplitudesBuffer, 0, amplitudes.subarray(index, index + kernelLength));
 
     const encoder = device.createCommandEncoder();
     const pass = encoder.beginComputePass();
@@ -141,7 +156,7 @@ async function initialize(sampleRate) {
 
     await resultsBuffer.mapAsync(GPUMapMode.READ);
     const results = new Float32Array(resultsBuffer.getMappedRange());
-    outputs[0].set(results, index);
+    samples.set(results, index);
     resultsBuffer.unmap();
 
     phase = (phase + kernelLength * frequency) % sampleRate;

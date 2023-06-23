@@ -12,6 +12,11 @@ export default class SynthProcessor extends AudioWorkletProcessor {
         defaultValue: 480,
         automationRate: "k-rate",
       },
+      {
+        name: "amplitude",
+        defaultValue: 0.0,
+        automationRate: "a-rate",
+      },
     ];
   }
 
@@ -22,10 +27,13 @@ export default class SynthProcessor extends AudioWorkletProcessor {
   #states;
 
   /** @type {Float32Array} */
+  #amplitudes;
+
+  /** @type {Float32Array} */
   #output;
 
   /** @type {number} */
-  #outputFrameIndex = 0;
+  #outputSampleIndex = 0;
 
   /** @type {number} */
   #outputKernelIndex = 0;
@@ -41,7 +49,8 @@ export default class SynthProcessor extends AudioWorkletProcessor {
       switch (data.type) {
         case "worker_ready": {
           this.#states = new Int32Array(data.buffers.states);
-          this.#output = new Float32Array(data.buffers.output);
+          this.#amplitudes = new Float32Array(data.buffers.amplitudes);
+          this.#output = new Float32Array(data.buffers.samples);
 
           this.#initialized = true;
           this.port.postMessage(/** @type {Data} */({
@@ -68,12 +77,17 @@ export default class SynthProcessor extends AudioWorkletProcessor {
       return true;
     }
 
-    const outputFrame = outputs[0][0];
-    const endIndex = this.#outputFrameIndex + outputFrame.length;
-    outputFrame.set(this.#output.subarray(this.#outputFrameIndex, endIndex));
-    this.#outputFrameIndex = endIndex;
+    const frequency = parameters["frequency"][0];
+    const amplitude = parameters["amplitude"];
 
-    this.#states[stateIndex.frequency] = parameters["frequency"][0];
+    const outputFrame = outputs[0][0];
+    const startIndex = this.#outputSampleIndex;
+    const endIndex = startIndex + outputFrame.length;
+
+    this.#states[stateIndex.frequency] = frequency;
+    this.#amplitudes.set(amplitude, startIndex);
+    outputFrame.set(this.#output.subarray(startIndex, endIndex));
+    this.#outputSampleIndex = endIndex;
 
     if (++this.#inputFrameLength >= 8) {
       Atomics.notify(this.#states, stateIndex.processRequest, 1);
@@ -83,8 +97,8 @@ export default class SynthProcessor extends AudioWorkletProcessor {
       }
       this.#states[stateIndex.outputKernelIndex] = this.#outputKernelIndex;
 
-      if (this.#outputFrameIndex === this.#output.length) {
-        this.#outputFrameIndex = 0;
+      if (this.#outputSampleIndex === this.#output.length) {
+        this.#outputSampleIndex = 0;
       }
 
       this.#inputFrameLength = 0;
