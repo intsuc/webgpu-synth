@@ -1,6 +1,7 @@
 export type Data =
   | {
     type: "initialize_worker",
+    sampleRate: number,
   }
   | {
     type: "worker_ready",
@@ -11,4 +12,4 @@ export type Data =
   }
   | {
     type: "processor_ready",
-  }
+  };

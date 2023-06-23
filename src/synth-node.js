@@ -62,6 +62,7 @@ class SynthNode extends AudioWorkletNode {
 
     this.#worker.postMessage(/** @type {Data} */({
       type: "initialize_worker",
+      sampleRate: context.sampleRate,
     }));
   }
 }
