@@ -6,9 +6,10 @@ import { stateIndex } from "./constants.js";
 /** @typedef {import("./messages").Data} Data */
 
 /**
+ * @param {number} kernelLength
  * @param {number} sampleRate
  */
-function generateCode(sampleRate) {
+function generateCode(kernelLength, sampleRate) {
   return `
 const tau_normalized: f32 = ${2.0 * Math.PI / sampleRate};
 
@@ -22,11 +23,11 @@ var<uniform> frequency: f32;
 
 @group(0)
 @binding(2)
-var<storage, read_write> amplitudes: array<f32>;
+var<storage, read_write> amplitudes: array<f32, ${kernelLength}>;
 
 @group(0)
 @binding(3)
-var<storage, read_write> samples: array<f32>;
+var<storage, read_write> samples: array<f32, ${kernelLength}>;
 
 @compute
 @workgroup_size(32)
@@ -110,7 +111,7 @@ async function initialize(sampleRate) {
     }),
     compute: {
       module: device.createShaderModule({
-        code: generateCode(sampleRate),
+        code: generateCode(kernelLength, sampleRate),
       }),
       entryPoint: "main",
     },

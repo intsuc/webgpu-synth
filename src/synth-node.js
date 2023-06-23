@@ -71,14 +71,18 @@ class SynthNode extends AudioWorkletNode {
     }));
   }
 
-  static get #code() {
+  /**
+   * @param {number} kernelLength
+   * @returns
+   */
+  static #generateCode(kernelLength) {
     return `
-@group(0) @binding(0) var<storage, read> samples: array<f32>;
+@group(0) @binding(0) var<storage, read> samples: array<f32, ${kernelLength}>;
 
 @vertex fn vertex_main(
   @builtin(vertex_index) index : u32
 ) -> @builtin(position) vec4f {
-  return vec4f(f32(index) / 512.0 - 1.0, samples[index], 0.0, 1.0);
+  return vec4f(f32(index) / ${kernelLength / 2} - 1.0, samples[index], 0.0, 1.0);
 }
 
 @fragment fn fragment_main() -> @location(0) vec4f {
@@ -122,7 +126,7 @@ class SynthNode extends AudioWorkletNode {
       ],
     });
     const module = device.createShaderModule({
-      code: SynthNode.#code,
+      code: SynthNode.#generateCode(kernelLength),
     });
     const pipeline = device.createRenderPipeline({
       layout: device.createPipelineLayout({
