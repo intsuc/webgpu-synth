@@ -161,8 +161,8 @@ class SynthNode extends AudioWorkletNode {
 
       renderPassDescriptor.colorAttachments[0].view = context.getCurrentTexture().createView();
 
-      const offset = kernelLength * states[stateIndex.outputKernelIndex];
-      queue.writeBuffer(samplesBuffer, 0, samples, offset, kernelLength);
+      const kernelIndex = kernelLength * states[stateIndex.outputKernelIndex];
+      queue.writeBuffer(samplesBuffer, 0, samples, kernelIndex, kernelLength);
 
       const encoder = device.createCommandEncoder();
       const pass = encoder.beginRenderPass(renderPassDescriptor);

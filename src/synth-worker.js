@@ -132,18 +132,16 @@ async function initialize(sampleRate) {
     buffers,
   }));
 
-  let phase = 0;
-  let index = 0;
-
   while (Atomics.wait(states, stateIndex.processRequest, 0) === "ok") {
-    phaseArray[0] = phase;
+    const kernelIndex = kernelLength * states[stateIndex.outputKernelIndex];
+
     queue.writeBuffer(phaseBuffer, 0, phaseArray);
 
     const frequency = states[stateIndex.frequency];
     frequencyArray[0] = frequency;
     queue.writeBuffer(frequencyBuffer, 0, frequencyArray);
 
-    queue.writeBuffer(amplitudesBuffer, 0, amplitudes.subarray(index, index + kernelLength));
+    queue.writeBuffer(amplitudesBuffer, 0, amplitudes, kernelIndex, kernelLength);
 
     const encoder = device.createCommandEncoder();
     const pass = encoder.beginComputePass();
@@ -157,15 +155,10 @@ async function initialize(sampleRate) {
 
     await resultsBuffer.mapAsync(GPUMapMode.READ);
     const results = new Float32Array(resultsBuffer.getMappedRange());
-    samples.set(results, index);
+    samples.set(results, kernelIndex);
     resultsBuffer.unmap();
 
-    phase = (phase + kernelLength * frequency) % sampleRate;
-
-    index += kernelLength;
-    if (index === bufferLength) {
-      index = 0;
-    }
+    phaseArray[0] = (phaseArray[0] + kernelLength * frequency) % sampleRate;
 
     Atomics.store(states, stateIndex.processRequest, 0);
   }

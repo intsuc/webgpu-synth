@@ -36,7 +36,7 @@ export default class SynthProcessor extends AudioWorkletProcessor {
   #outputSampleIndex = 0;
 
   /** @type {number} */
-  #outputKernelIndex = 0;
+  #outputKernelIndex = 1;
 
   /** @type {number} */
   #inputFrameLength = 0;
@@ -96,8 +96,6 @@ export default class SynthProcessor extends AudioWorkletProcessor {
     this.#outputSampleIndex = endIndex;
 
     if (++this.#inputFrameLength >= 8) {
-      Atomics.notify(this.#states, stateIndex.processRequest, 1);
-
       if (++this.#outputKernelIndex === 4) {
         this.#outputKernelIndex = 0;
       }
@@ -108,6 +106,8 @@ export default class SynthProcessor extends AudioWorkletProcessor {
       }
 
       this.#inputFrameLength = 0;
+
+      Atomics.notify(this.#states, stateIndex.processRequest, 1);
     }
 
     return true;
