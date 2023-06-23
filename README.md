@@ -6,18 +6,18 @@
 flowchart LR
   subgraph SharedArrayBuffer
     States
-    OutputBuffer
+    OutputRingBuffer
   end
 
   MainScope --> DedicatedWorkerGlobalScope
   States --> MainScope
-  OutputBuffer --> MainScope
+  OutputRingBuffer --> MainScope
   MainScope <--> GPU
 
-  DedicatedWorkerGlobalScope --> OutputBuffer
+  DedicatedWorkerGlobalScope --> OutputRingBuffer
   DedicatedWorkerGlobalScope <--> States
   DedicatedWorkerGlobalScope <--> GPU
 
   AudioWorkletGlobalScope --> States
-  OutputBuffer --> AudioWorkletGlobalScope
+  OutputRingBuffer --> AudioWorkletGlobalScope
 ```
