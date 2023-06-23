@@ -19,10 +19,10 @@
 <body>
   <script src="coi-serviceworker.js"></script>
 
-  <input id="frequency-control" type="number" name="frequency" value="480" /> Hz
-  <div style="display: flex; flex-direction: column; width: 100%; height: 100%;">
-    <canvas id="display" style="display: block; width: 100%; height: 100%;"></canvas>
-  </div>
+  <span style="position: absolute; color: #ffffff;">
+    <span id="frequency-value"></span>Hz
+  </span>
+  <canvas id="display" style="display: block; width: 100%; height: 100%;"></canvas>
 
   <script src="src/main.js" type="module"></script>
 </body>
