@@ -6,17 +6,24 @@
   <title>WebGPU Synth</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+  <style>
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+    }
+  </style>
 </head>
 
 <body>
   <script src="coi-serviceworker.js"></script>
 
-  <div style="display: inline-flex; flex-direction: column;">
+  <div style="display: flex; flex-direction: column; width: 100%; height: 100%;">
     <div>
       <button id="play" disabled>play</button>
       <input id="frequency-control" type="number" name="frequency" value="480" /> Hz
     </div>
-    <canvas id="display" width="800" height="450"></canvas>
+    <canvas id="display" style="display: block; width: 100%; height: 100%;"></canvas>
   </div>
 
   <script src="src/main.js" type="module"></script>

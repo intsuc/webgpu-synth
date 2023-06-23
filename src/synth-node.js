@@ -27,6 +27,9 @@ class SynthNode extends AudioWorkletNode {
   /** @type {Float32Array} */
   #output;
 
+  /** @type {HTMLCanvasElement} */
+  #canvas;
+
   /**
    * @param {BaseAudioContext} context
    * @param {AudioWorkletNodeOptions | undefined} options
@@ -49,7 +52,7 @@ class SynthNode extends AudioWorkletNode {
             buffers: data.buffers,
           }));
 
-          this.#draw();
+          this.#initialize();
           break;
         }
         default: {
@@ -79,21 +82,34 @@ class SynthNode extends AudioWorkletNode {
     }));
   }
 
+  #initialize() {
+    this.#canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("display"));
+
+    new ResizeObserver((entries) => {
+      const entry = entries[0];
+      const canvas = /** @type {HTMLCanvasElement} */ (entry.target);
+      const width = entry.contentBoxSize[0].inlineSize;
+      const height = entry.contentBoxSize[0].blockSize;
+      canvas.width = width;
+      canvas.height = height;
+      this.#draw();
+    }).observe(this.#canvas);
+
+    this.#draw();
+  }
+
   #draw() {
     requestAnimationFrame(this.#draw.bind(this));
 
     const kernelLength = 1024;
-
-    const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("display"));
-    // TODO: use webgpu
-    const context = /** @type {CanvasRenderingContext2D } */ (canvas.getContext("2d"));
-    const width = canvas.width;
-    const height = canvas.height;
+    const width = this.#canvas.width;
+    const height = this.#canvas.height;
     const centerHeight = height / 2;
     const step = width / kernelLength;
-
     const startIndex = kernelLength * this.#states[stateIndex.outputKernelIndex];
 
+    // TODO: use webgpu
+    const context = /** @type {CanvasRenderingContext2D } */ (this.#canvas.getContext("2d"));
     context.clearRect(0, 0, width, height);
     context.beginPath();
     context.moveTo(0, centerHeight - this.#output[startIndex] * centerHeight);
