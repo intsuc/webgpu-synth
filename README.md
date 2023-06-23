@@ -4,17 +4,20 @@
 
 ```mermaid
 flowchart LR
-  MainScope --> DedicatedWorkerGlobalScope
-
-  DedicatedWorkerGlobalScope --> OutputBuffer
-  States --> DedicatedWorkerGlobalScope
-  DedicatedWorkerGlobalScope <--> GPU
-
   subgraph SharedArrayBuffer
     States
     OutputBuffer
   end
 
-  OutputBuffer --> AudioWorkletGlobalScope
+  MainScope --> DedicatedWorkerGlobalScope
+  States --> MainScope
+  OutputBuffer --> MainScope
+  MainScope <-- TODO --> GPU
+
+  DedicatedWorkerGlobalScope --> OutputBuffer
+  DedicatedWorkerGlobalScope <--> States
+  DedicatedWorkerGlobalScope <--> GPU
+
   AudioWorkletGlobalScope --> States
+  OutputBuffer --> AudioWorkletGlobalScope
 ```
