@@ -19,6 +19,12 @@ export async function createSynth(context, options = undefined) {
 };
 
 class SynthNode extends AudioWorkletNode {
+  /** @type {AudioParam} */
+  frequency = /** @type {AudioParam} */ (this.parameters.get("frequency"));
+
+  /** @type {AudioParam} */
+  amplitude = /** @type {AudioParam} */ (this.parameters.get("amplitude"));
+
   /** @type {Worker} */
   #worker;
 
